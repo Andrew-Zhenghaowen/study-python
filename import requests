@@ -1,0 +1,140 @@
+import requests
+import json
+from datetime import datetime
+
+# ========== 配置 ==========
+# 注册地址：https://openweathermap.org/api
+# 免费版每分钟 60 次请求，足够个人使用
+API_KEY = '1e8ad1bdac4594ec161315731af2848e' # 请替换成你自己的 API Key
+
+# ========== 天气查询函数 ==========
+def get_weather(city, api_key):
+    """查询指定城市的实时天气"""
+    # OpenWeatherMap API 地址
+    url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric&lang=zh_cn"
+    
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"请求失败: {e}")
+        return None
+
+def get_forecast(city, api_key):
+    """查询未来 5 天天气预报（每 3 小时一次）"""
+    url = f"https://api.openweathermap.org/data/2.5/forecast?q={city}&appid={api_key}&units=metric&lang=zh_cn"
+    
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"请求失败: {e}")
+        return None
+
+# ========== 显示函数 ==========
+def display_weather(data):
+    """显示当前天气"""
+    if not data or data.get('cod') != 200:
+        print("查询失败，请检查城市名或 API Key")
+        return
+    
+    # 解析数据
+    city = data.get('name', '未知')
+    country = data.get('sys', {}).get('country', '')
+    temp = data.get('main', {}).get('temp', 0)
+    feels_like = data.get('main', {}).get('feels_like', 0)
+    temp_min = data.get('main', {}).get('temp_min', 0)
+    temp_max = data.get('main', {}).get('temp_max', 0)
+    humidity = data.get('main', {}).get('humidity', 0)
+    pressure = data.get('main', {}).get('pressure', 0)
+    wind_speed = data.get('wind', {}).get('speed', 0)
+    wind_deg = data.get('wind', {}).get('deg', 0)
+    description = data.get('weather', [{}])[0].get('description', '')
+    
+    # 获取当前时间
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    # 打印天气信息
+    print("\n" + "=" * 50)
+    print(f"🌍 {city}, {country}  |  {now}")
+    print("=" * 50)
+    print(f"🌡️  温度: {temp}°C (体感 {feels_like}°C)")
+    print(f"📊 最低/最高: {temp_min}°C / {temp_max}°C")
+    print(f"💧 湿度: {humidity}%")
+    print(f"📈 气压: {pressure} hPa")
+    print(f"💨 风速: {wind_speed} m/s")
+    print(f"🧭 风向: {wind_deg}°")
+    print(f"☁️  天气: {description}")
+    print("=" * 50 + "\n")
+
+def display_forecast(data):
+    """显示未来天气预报（简化版）"""
+    if not data or data.get('cod') != '200':
+        print("天气预报查询失败")
+        return
+    
+    city = data.get('city', {}).get('name', '未知')
+    country = data.get('city', {}).get('country', '')
+    
+    print(f"\n📅 {city}, {country} 未来 5 天天气预报")
+    print("-" * 60)
+    
+    # 只取每天 12:00 的数据（每天一个）
+    daily_forecasts = {}
+    for item in data.get('list', []):
+        dt = datetime.fromtimestamp(item.get('dt', 0))
+        date_key = dt.strftime('%m-%d')
+        
+        if date_key not in daily_forecasts:
+            temp = item.get('main', {}).get('temp', 0)
+            desc = item.get('weather', [{}])[0].get('description', '')
+            daily_forecasts[date_key] = {
+                'temp': temp,
+                'desc': desc,
+                'dt': dt
+            }
+    
+    # 只显示前 5 天
+    for i, (date, info) in enumerate(list(daily_forecasts.items())[:5]):
+        weekday = info['dt'].strftime('%A')
+        print(f"{date}  {weekday[:3]}  |  {info['temp']}°C  |  {info['desc']}")
+    
+    print("-" * 60 + "\n")
+
+# ========== 主程序 ==========
+def main():
+    print("🌤️  实时天气查询系统")
+    print("=" * 50)
+    
+    # 获取 API Key
+    api_key = input("请输入 OpenWeatherMap API Key (直接回车使用默认): ").strip()
+    if not api_key:
+        api_key = API_KEY
+        if api_key == "YOUR_API_KEY":
+            print("\n⚠️  请先注册 OpenWeatherMap 获取免费 API Key")
+            print("注册地址: https://openweathermap.org/api")
+            print("注册后把 API Key 填入代码中的 API_KEY 变量\n")
+            return
+    
+    # 获取城市名
+    city = input("请输入城市名 (如 Beijing, Shanghai, London): ").strip()
+    if not city:
+        print("城市名不能为空")
+        return
+    
+    print(f"\n正在查询 {city} 的天气...")
+    
+    # 查询当前天气
+    weather_data = get_weather(city, api_key)
+    if weather_data:
+        display_weather(weather_data)
+    
+    # 查询天气预报
+    forecast_data = get_forecast(city, api_key)
+    if forecast_data:
+        display_forecast(forecast_data)
+
+if __name__ == "__main__":
+    main()
